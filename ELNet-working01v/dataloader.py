@@ -7,9 +7,9 @@ import torch.nn.functional as F
 import torch.utils.data as data
 import utils as ut
 
-# PyTorch class to load the MRNet dataset
+# PyTorch class to load the ELNet dataset
 
-class MRDataset(data.Dataset):
+class ELDataset(data.Dataset):
     def __init__(self, root_dir, task, plane, train=True, weights=None):
         super().__init__()
         self.task = task
@@ -49,15 +49,18 @@ class MRDataset(data.Dataset):
 
         if self.train:
             # data augmentation
-            array = ut.random_shift(array, 25)
-            array = ut.random_rotate(array, 25)
+            array = ut.random_shift(array, 10)
+            array = ut.random_rotate(array, 10)
             array = ut.random_flip(array)
+        if self.plane == 'axial' or self.plane == 'coronal':
+            array = ut.random_rotate(array, 90)
+
 
         # data standardization
-        array = (array - 58.09) / 49.73
-        array = np.stack((array,)*3, axis=1)
+        #array = (array - 58.09) / 49.73    ???? no need for LayerNorm layer 
+        #array = np.stack((array,)*3, axis=1)
 
-        array = torch.FloatTensor(array) # array size is now [S, 224, 224, 3]
+        array = torch.FloatTensor(array) # array size is now [S, 3, 256, 256]
 
         return array, label, weight
 
