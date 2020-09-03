@@ -57,7 +57,7 @@ class ELDataset(data.Dataset):
 
 
         # data standardization
-        #array = (array - 58.09) / 49.73    ???? no need for LayerNorm layer 
+        #array = (array - 58.09) / 49.73    ???? no need cause LayerNorm layer 
         #array = np.stack((array,)*3, axis=1)
 
         array = torch.FloatTensor(array) # array size is now [S, 3, 256, 256]
