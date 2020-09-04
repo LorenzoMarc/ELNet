@@ -33,8 +33,6 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_trues = []
     losses = []
 
-    criterion = nn.CrossEntropyLoss()
-
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
@@ -43,7 +41,10 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         prediction = model(image.float())
 
-        loss = criterion(prediction, label, weight=weight)
+        label = label[0]
+        weight = weight[0]
+
+        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
         
         optimizer.zero_grad()
         loss.backward()
@@ -98,17 +99,19 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_class_preds = []
     losses = []
 
-    criterion = nn.CrossEntropyLoss()
-
+   
     for i, (image, label, weight) in enumerate(val_loader):
 
         image = image.to(device)
         label = label.to(device)
         weight = weight.to(device)
 
-        prediction = model.forward(image.float())
+        prediction = model(image.float())
 
-        loss = criterion(prediction, label, weight=weight)
+        label = label[0]
+        weight = weight[0]
+
+        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
 
         loss_value = loss.item()
         losses.append(loss_value)
@@ -287,7 +290,9 @@ def parse_arguments():
     parser.add_argument('-p', '--plane', type=str, required=True,
                         choices=['sagittal', 'coronal', 'axial'])
     parser.add_argument('--data-path', type=str)
+
     parser.add_argument('--norm_type', type=str, choices=['layer', 'contrast'], default='layer')
+    
     parser.add_argument('--prefix_name', type=str, required=True)
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)
