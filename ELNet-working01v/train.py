@@ -13,8 +13,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 
-from dataloader import MRDataset
-from models.mrnet import MRNet
+from dataloader import ELDataset
+from models.mrnet import ELNet
 
 from sklearn import metrics
 import csv
@@ -32,7 +32,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
-    criterion = nn.CrossEntropyLoss()
+
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
@@ -41,7 +41,10 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         prediction = model(image.float())
 
-        loss = criterion(prediction, label, weight=weight)
+        label = label[0]
+        weight = weight[0]
+
+        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
         
         optimizer.zero_grad()
         loss.backward()
@@ -95,16 +98,20 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_preds = []
     y_class_preds = []
     losses = []
-    criterion = nn.CrossEntropyLoss()
+
+   
     for i, (image, label, weight) in enumerate(val_loader):
 
         image = image.to(device)
         label = label.to(device)
         weight = weight.to(device)
 
-        prediction = model.forward(image.float())
+        prediction = model(image.float())
 
-        loss = criterion(prediction, label, weight=weight)
+        label = label[0]
+        weight = weight[0]
+
+        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
 
         loss_value = loss.item()
         losses.append(loss_value)
@@ -181,10 +188,10 @@ def run(args):
     writer = SummaryWriter(logdir)
 
     # create training and validation set
-    train_dataset = MRDataset(args.data_path, args.task, args.plane, train=True)
+    train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, drop_last=False)
 
-    validation_dataset = MRDataset(args.data_path, args.task, args.plane, train=False)
+    validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
     validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=-True, num_workers=2, drop_last=False)
 
     if torch.cuda.is_available():
@@ -193,10 +200,10 @@ def run(args):
         device = torch.device('cpu')
 
     # create the model
-    mrnet = MRNet()
-    mrnet = mrnet.to(device)
+    elnet = ELNet(args.norm_type)
+    elnet = elnet.to(device)
 
-    optimizer = optim.Adam(mrnet.parameters(), lr=args.lr, weight_decay=0.01)
+    optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
 
     if args.lr_scheduler == "plateau":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -225,7 +232,7 @@ def run(args):
         t_start = time.time()
         
         # train
-        train_loss, train_auc = train_model(mrnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
+        train_loss, train_auc = train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
         
         # evaluate
         val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity = evaluate_model(mrnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
@@ -254,7 +261,7 @@ def run(args):
                 for f in os.listdir(exp_dir + '/models/'):
                     if (args.task in f) and (args.plane in f) and (args.prefix_name in f):
                         os.remove(exp_dir + f'/models/{f}')
-                torch.save(mrnet, exp_dir + f'/models/{file_name}')
+                torch.save(elnet, exp_dir + f'/models/{file_name}')
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -283,6 +290,9 @@ def parse_arguments():
     parser.add_argument('-p', '--plane', type=str, required=True,
                         choices=['sagittal', 'coronal', 'axial'])
     parser.add_argument('--data-path', type=str)
+
+    parser.add_argument('--norm_type', type=str, choices=['layer', 'contrast'], default='layer')
+    
     parser.add_argument('--prefix_name', type=str, required=True)
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)

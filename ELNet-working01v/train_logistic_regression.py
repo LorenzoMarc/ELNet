@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
-from dataloader import MRDataset
+from dataloader import ELDataset
 import tqdm
 import csv
 import utils as ut
@@ -35,12 +35,12 @@ def extract_predictions(task, plane, path_to_models, train=True):
     else:
         device = torch.device('cpu')
 
-    mrnet = torch.load(model_path)
-    mrnet = mrnet.to(device)
+    elnet = torch.load(model_path)
+    elnet = elnet.to(device)
     
-    mrnet.eval()
+    elnet.eval()
     
-    dataset = MRDataset(args.data_path, 
+    dataset = ELDataset(args.data_path, 
                               task, 
                               plane,  
                               train=train)
