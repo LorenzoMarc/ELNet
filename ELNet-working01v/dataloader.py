@@ -43,7 +43,8 @@ class ELDataset(data.Dataset):
     def __getitem__(self, index):
         array = np.load(self.paths[index])
         
-        label = torch.FloatTensor([self.labels[index]])
+        #label = torch.FloatTensor([self.labels[index]])
+        label = torch.LongTensor([self.labels[index]])
 
         weight = torch.FloatTensor([self.weights[self.labels[index]]])
 
@@ -57,8 +58,8 @@ class ELDataset(data.Dataset):
 
 
         # data standardization
-        #array = (array - 58.09) / 49.73    ???? no need cause LayerNorm layer 
-        #array = np.stack((array,)*3, axis=1)
+        array = (array - 58.09) / 49.73   # ???? no need cause LayerNorm layer 
+        array = np.stack((array,)*3, axis=1)
 
         array = torch.FloatTensor(array) # array size is now [S, 3, 256, 256]
 

@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 
 from dataloader import ELDataset
-from models.mrnet import ELNet
+from models.elnet import ELNet
 
 from sklearn import metrics
 import csv
@@ -32,7 +32,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
-
+    soft = nn.Softmax(dim=1)
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
@@ -53,7 +53,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         loss_value = loss.item()
         losses.append(loss_value)
 
-        probas = torch.sigmoid(prediction)
+        probas = soft(prediction)
 
         y_trues.append(int(label[0]))
         y_preds.append(probas[0].item())
@@ -200,7 +200,7 @@ def run(args):
         device = torch.device('cpu')
 
     # create the model
-    elnet = ELNet(args.norm_type)
+    elnet = ELNet()
     elnet = elnet.to(device)
 
     optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
