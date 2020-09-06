@@ -41,9 +41,6 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         prediction = model(image.float())
 
-        label = label[0]
-        weight = weight[0]
-
         loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
         
         optimizer.zero_grad()

@@ -138,7 +138,7 @@ class ELNet(nn.Module):
  
     self.block1= nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size=5, stride =1, padding = 2),
-        nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True),/
+        nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True),
         nn.ReLU()
     )
  
