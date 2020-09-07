@@ -32,25 +32,26 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
-    soft = nn.Softmax(dim=1)
+    soft = nn.Softmax(dim=0)
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
         label = label.to(device)
         weight = weight.to(device)
 
+        optimizer.zero_grad()
         prediction = model(image.float())
 
-        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
-        
-        optimizer.zero_grad()
+        loss = nn.CrossEntropyLoss(weight=weight)(prediction, torch.max(label, 1)[1])
+              
         loss.backward()
         optimizer.step()
 
         loss_value = loss.item()
         losses.append(loss_value)
 
-        probas = soft(prediction)
+        #probas = soft(prediction)
+        probas = torch.sigmoid(prediction)
 
         y_trues.append(int(label[0]))
         y_preds.append(probas[0].item())
@@ -71,9 +72,9 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
                       num_epochs,
                       i,
                       len(train_loader),
-                      np.round(np.mean(losses), 4),
-                      np.round(auc, 4),
-                      current_lr
+                      loss_value, #np.round(np.mean(losses), 4),
+                      label.item(),#np.round(auc, 4),
+                      probas[0].item() #current_lr
                   )
                   )
 
@@ -104,10 +105,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         weight = weight.to(device)
 
         prediction = model(image.float())
-
-        label = label[0]
-        weight = weight[0]
-
+        label = torch.argmax(label, 1)
         loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
 
         loss_value = loss.item()
@@ -199,7 +197,11 @@ def run(args):
     # create the model
     elnet = ELNet()
     elnet = elnet.to(device)
-
+    '''
+    paramst = list(elnet.parameters())
+    print(len(paramst))
+    print(paramst[0].size())  # conv1's .weight
+    '''
     optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
 
     if args.lr_scheduler == "plateau":
