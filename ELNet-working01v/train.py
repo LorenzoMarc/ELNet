@@ -32,7 +32,9 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
-    soft = nn.Softmax(dim=0)
+
+    soft = nn.Softmax(dim=1)
+
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
@@ -40,7 +42,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         weight = weight.to(device)
 
         optimizer.zero_grad()
-        prediction = model(image.float())
+
+        prediction = model(image.float())  #date da softmax. Che prende i logits e diventano prediction
 
         loss = nn.CrossEntropyLoss(weight=weight)(prediction, torch.max(label, 1)[1])
               
@@ -234,7 +237,7 @@ def run(args):
         train_loss, train_auc = train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
         
         # evaluate
-        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity = evaluate_model(mrnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
+        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity = evaluate_model(elnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
 
         if args.lr_scheduler == 'plateau':
             scheduler.step(val_loss)

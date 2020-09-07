@@ -186,7 +186,8 @@ class ELNet(nn.Module):
 
     self.fc1= nn.Sequential(
         nn.Dropout(),
-        nn.Linear(16*K, 1)
+        nn.Linear(16*K, 2),
+        nn.Softmax(dim=1)   #PROVA COSì
         )
     
 
