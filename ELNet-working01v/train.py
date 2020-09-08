@@ -53,8 +53,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         loss_value = loss.item()
         losses.append(loss_value)
 
-        #probas = soft(prediction)
-        probas = torch.sigmoid(prediction)
+        probas = soft(prediction)
+        #probas = torch.sigmoid(prediction)
 
         y_trues.append(int(label[0]))
         y_preds.append(probas[0].item())
