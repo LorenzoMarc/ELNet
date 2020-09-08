@@ -34,7 +34,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     losses = []
 
     soft = nn.Softmax(dim=1)
-
+    criterion = nn.CrossEntropyLoss()
     for i, (image, label, weight) in enumerate(train_loader):
 
         image = image.to(device)
@@ -45,7 +45,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         prediction = model(image.float())  #date da softmax. Che prende i logits e diventano prediction
 
-        loss = nn.CrossEntropyLoss(weight=weight)(prediction, torch.max(label, 1)[1])
+        loss = criterion(prediction, torch.max(label, 1)[0])
               
         loss.backward()
         optimizer.step()
@@ -57,10 +57,11 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         #probas = torch.sigmoid(prediction)
 
         y_trues.append(int(label[0]))
-        y_preds.append(probas[0].item())
+        #y_preds.append(probas[0].item())
+        y_preds.append(probas.data.list()[0]) # DA vedere i valori passati
 
         try:
-            auc = metrics.roc_auc_score(y_trues, y_preds)
+            auc = metrics.roc_auc_score(y_trues, y_preds) #y_preds è un tensore([0.7123, 0.112],[0.,0.]...)
         except:
             auc = 0.5
 
@@ -75,9 +76,9 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
                       num_epochs,
                       i,
                       len(train_loader),
-                      loss_value, #np.round(np.mean(losses), 4),
-                      label.item(),#np.round(auc, 4),
-                      probas[0].item() #current_lr
+                      np.round(np.mean(losses), 4),
+                      np.round(auc, 4),
+                      current_lr
                   )
                   )
 
@@ -100,7 +101,8 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_class_preds = []
     losses = []
 
-   
+    soft = nn.Softmax(dim=1)
+    criterion = nn.CrossEntropyLoss()
     for i, (image, label, weight) in enumerate(val_loader):
 
         image = image.to(device)
@@ -109,12 +111,13 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
 
         prediction = model(image.float())
         label = torch.argmax(label, 1)
-        loss = nn.CrossEntropyLoss(weight=weight)(prediction, label)
+        loss = criterion(prediction, label)
 
         loss_value = loss.item()
         losses.append(loss_value)
 
-        probas = torch.sigmoid(prediction)
+        #probas = torch.sigmoid(prediction)
+        probas = torch.soft(prediction)
 
         y_trues.append(int(label[0]))
         y_preds.append(probas[0].item())
