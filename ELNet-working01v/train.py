@@ -15,6 +15,7 @@ from tensorboardX import SummaryWriter
 
 from dataloader import ELDataset
 from models.elnet import ELNet
+#from torchsampler.imbalanced import ImbalancedDatasetSampler
 
 from sklearn import metrics
 import csv
@@ -43,7 +44,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         optimizer.zero_grad()
 
-        prediction = model(image.float())  #date da softmax. Che prende i logits e diventano prediction
+        #date da softmax nel modello. Prende i logits e diventano percent
+        prediction = model(image.float()) 
 
         loss = criterion(prediction, torch.max(label, 1)[0])
               
@@ -58,7 +60,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         y_trues.append(int(label[0]))
         #y_preds.append(probas[0].item())
-        y_preds.append(probas.data.list()[0]) # DA vedere i valori passati
+        preds = torch.argmax(probas, 1)
+        y_preds.append(preds) # DA vedere i valori passati
 
         try:
             auc = metrics.roc_auc_score(y_trues, y_preds) #y_preds è un tensore([0.7123, 0.112],[0.,0.]...)
@@ -110,18 +113,19 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         weight = weight.to(device)
 
         prediction = model(image.float())
-        label = torch.argmax(label, 1)
+        label = torch.max(label, 1)[0]#torch.argmax(label, 1)
         loss = criterion(prediction, label)
 
         loss_value = loss.item()
         losses.append(loss_value)
 
         #probas = torch.sigmoid(prediction)
-        probas = torch.soft(prediction)
+        probas = soft(prediction)
 
         y_trues.append(int(label[0]))
-        y_preds.append(probas[0].item())
-        y_class_preds.append((probas[0] > 0.5).float().item())
+        preds = torch.argmax(probas, 1)
+        y_preds.append(preds)
+        y_class_preds.append((preds > 0.5).float().item())
 
         try:
             auc = metrics.roc_auc_score(y_trues, y_preds)
@@ -201,13 +205,11 @@ def run(args):
         device = torch.device('cpu')
 
     # create the model
-    elnet = ELNet()
+    K = args.K
+    norm_type = args.set_norm_type
+    elnet = ELNet(K, norm_type)
     elnet = elnet.to(device)
-    '''
-    paramst = list(elnet.parameters())
-    print(len(paramst))
-    print(paramst[0].size())  # conv1's .weight
-    '''
+
     optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
 
     if args.lr_scheduler == "plateau":
@@ -229,7 +231,7 @@ def run(args):
     log_every = args.log_every
 
     t_start_training = time.time()
-
+    
     # train and test loop
     for epoch in range(num_epochs):
         current_lr = get_lr(optimizer)
@@ -296,8 +298,9 @@ def parse_arguments():
                         choices=['sagittal', 'coronal', 'axial'])
     parser.add_argument('--data-path', type=str)
 
-    parser.add_argument('--norm_type', type=str, choices=['layer', 'contrast'], default='layer')
-    
+    parser.add_argument('--set_norm_type', type=str, choices=['layer', 'contrast'], default='layer')
+    parser.add_argument('--K', type=int, choices=[1,2,3,4], default=4)
+
     parser.add_argument('--prefix_name', type=str, required=True)
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)

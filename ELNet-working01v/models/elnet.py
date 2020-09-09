@@ -122,10 +122,9 @@ def get_pad_layer_1d(pad_type):
 
 class ELNet(nn.Module):
  
-   def __init__(self):
+   def __init__(self, K,  norm_type):
     super(ELNet, self).__init__()
 
-    K = 4
 
     self.conv1 = nn.Conv2d(3,4*K, kernel_size=7, stride= 2, padding=3)
     
@@ -187,7 +186,7 @@ class ELNet(nn.Module):
     self.fc1= nn.Sequential(
         nn.Dropout(),
         nn.Linear(16*K, 2),
-        nn.Softmax(dim=1)   #PROVA COSì
+        nn.Softmax(dim=1)   
         )
     
 
