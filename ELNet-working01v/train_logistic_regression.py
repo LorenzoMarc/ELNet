@@ -55,7 +55,7 @@ def extract_predictions(task, plane, path_to_models, train=True):
     with torch.no_grad():
         for image, label, _ in tqdm.tqdm(loader):
             image = image.to(device)
-            logit = mrnet(image)
+            logit = elnet(image)
             prediction = torch.sigmoid(logit)
             predictions.append(prediction[0].item())
             labels.append(label[0].item())
