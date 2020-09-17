@@ -9,7 +9,7 @@ from dataloader import ELDataset
 import tqdm
 import csv
 import utils as ut
-
+import torch.nn as nn
 parser = argparse.ArgumentParser()
 parser.add_argument('--path-to-models', type=str, required=True)
 parser.add_argument('--data-path', type=str)
@@ -25,6 +25,8 @@ torch.cuda.manual_seed_all(args.seed)
 def extract_predictions(task, plane, path_to_models, train=True):
     assert task in ['acl', 'meniscus', 'abnormal']
     assert plane in ['axial', 'coronal', 'sagittal']
+
+    soft = nn.Softmax(dim=1)
     
     models = os.listdir(path_to_models)
     model_name = list(filter(lambda name: task in name and plane in name, models))[0]
@@ -56,8 +58,8 @@ def extract_predictions(task, plane, path_to_models, train=True):
         for image, label, _ in tqdm.tqdm(loader):
             image = image.to(device)
             logit = elnet(image)
-            prediction = torch.sigmoid(logit)
-            predictions.append(prediction[0].item())
+            prediction = soft(logit)
+            predictions.append(torch.argmax(prediction, dim=1))#prediction[0].item())
             labels.append(label[0].item())
 
     return predictions, labels

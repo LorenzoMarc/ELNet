@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data as data
 import utils as ut
+import torchvision.transforms as transform
+import random
 
 # PyTorch class to load the ELNet dataset
 
@@ -49,13 +51,17 @@ class ELDataset(data.Dataset):
         weight = torch.FloatTensor([self.weights[self.labels[index]]])
 
         if self.train:
-            # data augmentation
-            array = ut.random_shift(array, 10)
-            array = ut.random_rotate(array, 10)
-            array = ut.random_flip(array)
+          # data augmentation
+          array = ut.random_shift(array, 10)
+          array = ut.random_rotate(array, 10)
+          array = ut.random_flip(array)
         if self.plane == 'axial' or self.plane == 'coronal':
-            array = ut.random_rotate(array, 90)
-
+           array = ut.random_rotate(array, 90)
+           '''
+           l = [90,180,270]
+           rand_rotation = transform.RandomRotation(random.choice(l))
+           array = rand_rotation(array)
+           '''
 
         # data standardization
         #array = (array - 58.09) / 49.73   # ???? no needs cause LayerNorm layer 
