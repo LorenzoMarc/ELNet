@@ -106,7 +106,6 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_class_preds = []
     losses = []
 
-    soft = nn.Softmax(dim=1)
     criterion = nn.CrossEntropyLoss()
     for i, (image, label, weight) in enumerate(val_loader):
 
@@ -115,18 +114,17 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         weight = weight.to(device)
 
         prediction = model(image.float())
-        label = torch.max(label, 1)[0]#torch.argmax(label, 1)
-        loss = criterion(prediction, label)
+        #label = torch.max(label, 1)[0]#torch.argmax(label, 1)
+        loss = criterion(prediction, label[0])
 
         loss_value = loss.item()
         losses.append(loss_value)
 
-        #probas = torch.sigmoid(prediction)
-        probas = soft(prediction)
-
+        probas = torch.sigmoid(prediction)
+    
         y_trues.append(int(label[0]))
         preds = torch.argmax(probas, 1)
-        y_preds.append(preds)
+        y_preds.append(int(preds))
         y_class_preds.append((preds > 0.5).float().item())
 
         try:
@@ -150,7 +148,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
                   )
                   )
 
-    #writer.add_scalar('Val/AUC_epoch', auc, epoch)
+    writer.add_scalar('Val/AUC_epoch', auc, epoch)
 
     val_loss_epoch = np.round(np.mean(losses), 4)
     val_auc_epoch = np.round(auc, 4)
@@ -197,11 +195,11 @@ def run(args):
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
     samp_flag = args.sampler
-
-    #first choice: Balancing dataset overrides labels of majority class
+    ##-----SAMPLER------
+    #balanced choice: Balancing dataset overrides labels of majority class
     #------------ results: Distribuition of labels over the samples is 50/50.
     #-------------------- Dataset's length is unchanged.
-    #secondo choice: oversampling dataset repeats records of the minority class
+    #oversampled choice: oversampling dataset repeats records of the minority class
     #--------------- results: Dataset is larger and balanced.
     #------------------------ Length of majority class is unchanged
 
