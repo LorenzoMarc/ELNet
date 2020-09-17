@@ -42,13 +42,14 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         label = label.to(device)
         weight = weight.to(device)
 
-        optimizer.zero_grad()
+        
 
         #date da softmax nel modello. Prende i logits e diventano percent
         prediction = model(image.float()) 
 
-        loss = criterion(prediction, torch.max(label, 1)[0])
-              
+        loss = criterion(prediction, label[0])
+
+        optimizer.zero_grad()      
         loss.backward()
         optimizer.step()
 
@@ -60,11 +61,11 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         y_trues.append(int(label[0]))
         #y_preds.append(probas[0].item())
-        preds = torch.argmax(probas, 1)
-        y_preds.append(preds) # DA vedere i valori passati
+        preds = torch.argmax(probas,dim=1)
+        y_preds.append(int(preds)) 
 
         try:
-            auc = metrics.roc_auc_score(y_trues, y_preds) #y_preds è un tensore([0.7123, 0.112],[0.,0.]...)
+            auc = metrics.roc_auc_score(y_trues, y_preds)
         except:
             auc = 0.5
 
@@ -194,10 +195,20 @@ def run(args):
 
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=True, num_workers=4, drop_last=False)
+
+    #balancing dataset
+    class_sample_count = np.array([len(np.where(train_dataset.labels == t)[0]) for t in np.unique(train_dataset.labels)])
+    weight = 1. / class_sample_count
+    samples_weight = np.array([weight[t] for t in train_dataset.labels])
+
+    samples_weight = torch.from_numpy(samples_weight)
+    samples_weigth = samples_weight.float()
+    sampler = data.WeightedRandomSampler(samples_weight, len(samples_weight))
+
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, sampler = sampler, num_workers=4, drop_last=False)
 
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
-    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=-True, num_workers=2, drop_last=False)
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, num_workers=2, drop_last=False)
 
     if torch.cuda.is_available():
         device = torch.device('cuda')

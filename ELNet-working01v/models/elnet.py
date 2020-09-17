@@ -1,6 +1,3 @@
-import torch
-import torch.nn as nn
-#from torchvision import models
 # Copyright (c) 2019, Adobe Inc. All rights reserved.
 #
 # This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike
@@ -120,15 +117,28 @@ def get_pad_layer_1d(pad_type):
     return PadLayer
 # ELNet architecture definition
 
+# ELNet architecture definition
+
 class ELNet(nn.Module):
  
-   def __init__(self, K,  norm_type):
+   def __init__(self, K, norm_type):
     super(ELNet, self).__init__()
 
-
-    self.conv1 = nn.Conv2d(3,4*K, kernel_size=7, stride= 2, padding=3)
     
-    self.norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
+    self.conv1 = nn.Conv2d(1,4*K, kernel_size=7, stride= 2, padding=3)
+
+    if norm_type=='layer':
+      self.norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
+      norm2  = nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True)
+      norm3 = nn.LayerNorm((8*K, 29,29), eps = 1e-8, elementwise_affine=True)
+      norm4 = nn.LayerNorm((16*K, 13,13), eps = 1e-8, elementwise_affine=True)
+      norm5 = nn.LayerNorm((16*K, 5,5), eps = 1e-8, elementwise_affine=True)
+    else:
+      self.norm1 = nn.LayerNorm((1,4*K, 128,128), eps = 1e-8, elementwise_affine=True)
+      norm2  = nn.LayerNorm((1,4*K, 62,62), eps = 1e-8, elementwise_affine=True)
+      norm3 = nn.LayerNorm((1,8*K, 29,29), eps = 1e-8, elementwise_affine=True)
+      norm4 = nn.LayerNorm((1,16*K, 13,13), eps = 1e-8, elementwise_affine=True)
+      norm5 = nn.LayerNorm((1,16*K, 5,5), eps = 1e-8, elementwise_affine=True)
    
     self.blurpool1 = nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size= 7,stride=1,padding=1),
@@ -137,7 +147,7 @@ class ELNet(nn.Module):
  
     self.block1= nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size=5, stride =1, padding = 2),
-        nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True),
+        norm2,
         nn.ReLU()
     )
  
@@ -151,7 +161,7 @@ class ELNet(nn.Module):
  
     self.block2 = nn.Sequential(
         nn.Conv2d(8*K,8*K, kernel_size=3, stride=1, padding=1),
-        nn.LayerNorm((8*K, 29,29), eps = 1e-8, elementwise_affine=True),
+        norm3,
         nn.ReLU()  
     )
  
@@ -165,13 +175,13 @@ class ELNet(nn.Module):
  
     self.block3 = nn.Sequential(
         nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
-        nn.LayerNorm((16*K, 13,13), eps = 1e-8, elementwise_affine=True),
+        norm4,
         nn.ReLU()
 )
     
     self.block4 = nn.Sequential(
         nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
-        nn.LayerNorm((16*K, 5,5), eps = 1e-8, elementwise_affine=True),
+        norm5,
         nn.ReLU()         
     )
  
@@ -185,12 +195,12 @@ class ELNet(nn.Module):
 
     self.fc1= nn.Sequential(
         nn.Dropout(),
-        nn.Linear(16*K, 2),
-        nn.Softmax(dim=1)   
+        nn.Linear(16*K, 2)
         )
     
 
    def forward(self, x):
+    
     x = torch.squeeze(x, dim=0)
     x = self.norm1(self.conv1(x))
     # --> sx4Kx128x128
@@ -241,8 +251,7 @@ class ELNet(nn.Module):
     # --> sx16K
     # Feature Extraction
     x = self.pooling(x).view(x.size(0), -1)
-  
-    x = torch.max(x, 0, keepdim=True)[0]
+    x = torch.max(x, dim=0, keepdim=True)[0]
     # --> 16K
     x = self.fc1(x)
     # --> 2
