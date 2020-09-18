@@ -211,11 +211,12 @@ def run(args):
 
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
     validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=-True, num_workers=2, drop_last=False)
-
+    '''
     if torch.cuda.is_available():
-        device = torch.device('cuda')
+      device = torch.device('cuda')
     else:
-        device = torch.device('cpu')
+    '''
+    device = torch.device('cpu')
 
     # create the model
     K = args.K
