@@ -16,7 +16,6 @@ from tensorboardX import SummaryWriter
 
 from dataloader import ELDataset
 from models.elnet import ELNet
-#from torchsampler.imbalanced import ImbalancedDatasetSampler
 
 from sklearn import metrics
 import csv
@@ -43,9 +42,6 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         label = label.to(device)
         weight = weight.to(device)
 
-        
-
-        #date da softmax nel modello. Prende i logits e diventano percent
         prediction = model(image.float()) 
 
         loss = criterion(prediction, label[0])
@@ -58,10 +54,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         losses.append(loss_value)
 
         probas = soft(prediction)
-        #probas = torch.sigmoid(prediction)
 
         y_trues.append(int(label[0]))
-        #y_preds.append(probas[0].item())
         preds = torch.argmax(probas,dim=1)
         y_preds.append(int(preds)) 
 
@@ -84,8 +78,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
                       np.round(np.mean(losses), 4),
                       np.round(auc, 4),
                       current_lr
-                  )
-                  )
+                  ))
 
     writer.add_scalar('Train/AUC_epoch', auc, epoch)
 
