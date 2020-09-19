@@ -18,13 +18,32 @@ class ELNet(nn.Module):
  
    def __init__(self, K, norm_type):
     super(ELNet, self).__init__()
+
+    if norm_type=='layer':
+
+      self.norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
+      norm2  = nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True)
+      norm3 = nn.LayerNorm((8*K, 29,29), eps = 1e-8, elementwise_affine=True)
+      norm4 = nn.LayerNorm((16*K, 13,13), eps = 1e-8, elementwise_affine=True)
+      norm5 = nn.LayerNorm((16*K, 5,5), eps = 1e-8, elementwise_affine=True)
+    else:
+      self.norm1 = nn.InstanceNorm2d(4*K,eps=1e-8, affine=True)
+      norm2  = nn.InstanceNorm2d(4*K, eps=1e-8, affine=True)
+      norm3 = nn.InstanceNorm2d(8*K, eps=1e-8, affine=True)
+      norm4 = nn.InstanceNorm2d(16*K, eps=1e-8, affine=True)
+      norm5 = nn.InstanceNorm2d(16*K,eps=1e-8, affine=True)
+    
     
     self.conv1 = nn.Conv2d(1,4*K, kernel_size=7, stride= 2, padding=3)
     self.blurpool1 = nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(inplace=True),
         antialiased_cnns.BlurPool(channels=4*K, filt_size=3, stride=2))
-    self.block1=nn.Conv2d(4*K,4*K, kernel_size=5, stride =1, padding = 2)
+    self.block1= nn.Sequential(
+        nn.Conv2d(4*K,4*K, kernel_size=5, stride =1, padding = 2),
+        norm2,
+        nn.ReLU()
+    )
  
 
     self.conv2 = nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2)
@@ -33,17 +52,21 @@ class ELNet(nn.Module):
         nn.ReLU(),
         antialiased_cnns.BlurPool(channels=8*K, filt_size=3, stride=2) #prova filt = 3
     )
-    self.block2 = nn.Conv2d(8*K,8*K, kernel_size=3, stride=1, padding=1)
-          
-
- 
+    self.block2 = nn.Sequential(nn.Conv2d(8*K,8*K, kernel_size=3, stride=1, padding=1),
+        norm3,
+        nn.ReLU()
+    )
+      
     self.conv3 = nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1)
     self.blurpool3 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(inplace=True),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=3, stride=2) #prova filt = 3
     )
-    self.block3 = nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1)
+    self.block3 = nn.Sequential(nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
+        norm4,
+        nn.ReLU()
+    )
 
     
     self.conv4 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
@@ -52,7 +75,10 @@ class ELNet(nn.Module):
         nn.ReLU(inplace=True),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block4 = nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1)
+    self.block4 = nn.Sequential(nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
+        norm5,
+        nn.ReLU()
+    )
 
     self.conv5 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
     self.blurpool5 = nn.Sequential(
@@ -70,27 +96,9 @@ class ELNet(nn.Module):
     
 
    def forward(self, x):
-     norm_type='layer'
-     K = 4
-
-     if norm_type=='layer':
-       x = torch.squeeze(x, dim=0)
-       norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
-       norm2  = nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True)
-       norm3 = nn.LayerNorm((8*K, 29,29), eps = 1e-8, elementwise_affine=True)
-       norm4 = nn.LayerNorm((16*K, 13,13), eps = 1e-8, elementwise_affine=True)
-       norm5 = nn.LayerNorm((16*K, 5,5), eps = 1e-8, elementwise_affine=True)
-     else:
-       x= x[-1]
-       norm1 = nn.LayerNorm((x.size(1),4*K, 128,128), eps = 1e-8, elementwise_affine=True)
-       norm2  = nn.LayerNorm((x.size(1),4*K, 62,62), eps = 1e-8, elementwise_affine=True)
-       norm3 = nn.LayerNorm((x.size(1),8*K, 29,29), eps = 1e-8, elementwise_affine=True)
-       norm4 = nn.LayerNorm((x.size(1),16*K, 13,13), eps = 1e-8, elementwise_affine=True)
-       norm5 = nn.LayerNorm((x.size(1),16*K, 5,5), eps = 1e-8, elementwise_affine=True)
-    
-     
-     x=self.conv1(x)
-     x = norm1(x)
+     x = torch.squeeze(x, dim=0)    
+     x = self.conv1(x)
+     x = self.norm1(x)
      # --> sx4Kx128x128
      x = self.blurpool1(x)
      # --> sx4Kx62x62
@@ -98,8 +106,6 @@ class ELNet(nn.Module):
      b1 = x
      for i in [1,2]:
        b1 = self.block1(b1)
-       b1=norm2(b1)
-       b1=F.relu(b1)
 
      #skip connection
      x = x + b1
@@ -112,8 +118,6 @@ class ELNet(nn.Module):
      b2 = x
      for i in [1,2]:
        b2 = self.block2(b2)
-       b2=norm3(b2)
-       b2= F.relu(b2)
 
      #skip connection
      x = x + b2
@@ -124,8 +128,6 @@ class ELNet(nn.Module):
      # --> sx16Kx13x13
      #Block3 [3x3]
      b3 = self.block3(x)
-     b3 = norm4(b3)
-     b3 = F.relu(b3)
       
      #skip connection
      x = x + b3
@@ -135,8 +137,7 @@ class ELNet(nn.Module):
      # --> sx16Kx5x5
      #Block4 [3x3]
      b4 = self.block4(x)
-     b4=norm5(b4)
-     b4=F.relu(b4)
+
      #skip connection
      x = x + b4
   
