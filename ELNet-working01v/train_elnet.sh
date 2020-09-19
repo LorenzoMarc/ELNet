@@ -1,9 +1,9 @@
 DATE=$(date +"%Y-%m-%d-%H-%M")
 EXPERIMENT="ELNet-${DATE}-ELNet"
 DATA_PATH='/content/MRNet-v1.0/'
-NORM='contrast'
+NORM='layer'
 LR=1e-8
-EPOCHS=1
+EPOCHS=20
 PREFIX=ELNet
 SAMPLER='oversampling'
 
