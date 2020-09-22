@@ -33,6 +33,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
+    auc = 0.0
 
     soft = nn.Softmax(dim=1)
     criterion = nn.CrossEntropyLoss()
@@ -60,9 +61,9 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         y_preds.append(int(preds)) 
 
         try:
-            auc = metrics.roc_auc_score(y_trues, y_preds)
+          auc = metrics.roc_auc_score(y_trues, y_preds)
         except:
-            auc = 0.5
+          auc = 0.5
 
         writer.add_scalar('Train/Loss', loss_value,
                           epoch * len(train_loader) + i)
@@ -98,6 +99,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_preds = []
     y_class_preds = []
     losses = []
+    auc =0.0
 
     criterion = nn.CrossEntropyLoss()
     for i, (image, label, weight) in enumerate(val_loader):
@@ -121,9 +123,9 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         y_class_preds.append((preds > 0.5).float().item())
 
         try:
-            auc = metrics.roc_auc_score(y_trues, y_preds)
+          auc = metrics.roc_auc_score(y_trues, y_preds)
         except:
-            auc = 0.5
+          auc = 0.5
 
         writer.add_scalar('Val/Loss', loss_value, epoch * len(val_loader) + i)
         writer.add_scalar('Val/AUC', auc, epoch * len(val_loader) + i)
