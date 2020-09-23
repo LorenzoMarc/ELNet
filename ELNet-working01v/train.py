@@ -102,6 +102,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     auc =0.0
 
     criterion = nn.CrossEntropyLoss()
+    soft = nn.Softmax(dim=1)
     for i, (image, label, weight) in enumerate(val_loader):
 
         image = image.to(device)
@@ -115,7 +116,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         loss_value = loss.item()
         losses.append(loss_value)
 
-        probas = torch.sigmoid(prediction)
+        probas = soft(prediction)
     
         y_trues.append(int(label[0]))
         preds = torch.argmax(probas, 1)
@@ -198,6 +199,13 @@ def run(args):
     #--------------- results: Dataset is larger and balanced.
     #------------------------ Length of majority class is unchanged
 
+    weights = 1. / torch.tensor(class_sample_counts, dtype=torch.float)
+    samples_weights = weights[train_targets]
+    sampler = WeightedRandomSampler(
+    weights=samples_weights,
+    num_samples=len(samples_weights),
+    replacement=True)
+
     if (samp_flag == 'balanced'):
       class_sample_count = np.array([len(np.where(train_dataset.labels == t)[0]) for t in np.unique(train_dataset.labels)])
       weight = 1. / class_sample_count
@@ -212,21 +220,20 @@ def run(args):
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=sampler, num_workers=4, drop_last=False)
 
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
-    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=-True, num_workers=2, drop_last=False)
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=False, num_workers=2, drop_last=False)
     '''
     if torch.cuda.is_available():
       device = torch.device('cuda')
     else:
     '''
-    device = torch.device('cpu')
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu' )
     # create the model
     K = args.K
     norm_type = args.set_norm_type
     elnet = ELNet(K, norm_type)
     elnet = elnet.to(device)
 
-    optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
+    optimizer = optim.Adam(elnet.parameters(), lr=args.lr)#, weight_decay=0.01)
 
     if args.lr_scheduler == "plateau":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
