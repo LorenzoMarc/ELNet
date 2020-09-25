@@ -7,7 +7,6 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 from torchdata.samplers import RandomOverSampler
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -43,7 +42,7 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         label = label.to(device)
         weight = weight.to(device)
 
-        prediction = model(image.float()) 
+        prediction = model(image) 
 
         loss = criterion(prediction, label[0])
 
@@ -101,7 +100,6 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     losses = []
     auc =0.0
 
-    criterion = nn.CrossEntropyLoss()
     soft = nn.Softmax(dim=1)
     for i, (image, label, weight) in enumerate(val_loader):
 
@@ -109,8 +107,8 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         label = label.to(device)
         weight = weight.to(device)
 
-        prediction = model(image.float())
-        #label = torch.max(label, 1)[0]#torch.argmax(label, 1)
+        prediction = model.forward(image)
+        criterion = nn.CrossEntropyLoss()
         loss = criterion(prediction, label[0])
 
         loss_value = loss.item()
@@ -120,7 +118,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     
         y_trues.append(int(label[0]))
         preds = torch.argmax(probas, 1)
-        y_preds.append(int(preds))
+        y_preds.append(preds.item())
         y_class_preds.append((preds > 0.5).float().item())
 
         try:
@@ -132,7 +130,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         writer.add_scalar('Val/AUC', auc, epoch * len(val_loader) + i)
 
         if (i % log_every == 0) & (i > 0):
-            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss {4} | val auc : {5} | lr : {6}'''.
+            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss {4} | val auc : {5} | lr : {6} '''.
                   format(
                       epoch + 1,
                       num_epochs,
@@ -188,60 +186,34 @@ def run(args):
 
     writer = SummaryWriter(logdir)
 
+    ##-----SAMPLER------
+    
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
-    samp_flag = args.sampler
-    ##-----SAMPLER------
-    #balanced choice: Balancing dataset overrides labels of majority class
-    #------------ results: Distribuition of labels over the samples is 50/50.
-    #-------------------- Dataset's length is unchanged.
-    #oversampled choice: oversampling dataset repeats records of the minority class
-    #--------------- results: Dataset is larger and balanced.
-    #------------------------ Length of majority class is unchanged
-
-    weights = 1. / torch.tensor(class_sample_counts, dtype=torch.float)
-    samples_weights = weights[train_targets]
-    sampler = WeightedRandomSampler(
-    weights=samples_weights,
-    num_samples=len(samples_weights),
-    replacement=True)
-
-    if (samp_flag == 'balanced'):
-      class_sample_count = np.array([len(np.where(train_dataset.labels == t)[0]) for t in np.unique(train_dataset.labels)])
-      weight = 1. / class_sample_count
-      samples_weight = np.array([weight[t] for t in train_dataset.labels])
-
-      samples_weight = torch.from_numpy(samples_weight)
-      samples_weigth = samples_weight.float()
-      sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
-    else:
-      sampler = RandomOverSampler(torch.Tensor(train_dataset.labels))
-
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=sampler, num_workers=4, drop_last=False)
-
+    #oversampling 
+    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], len(train_dataset.weights[train_dataset.labels]))
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=train_sampler, num_workers=4, drop_last=False)
+    
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
-    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=False, num_workers=2, drop_last=False)
-    '''
-    if torch.cuda.is_available():
-      device = torch.device('cuda')
-    else:
-    '''
+    validation_loader = torch.utils.data.DataLoader(validation_dataset,batch_size=1, shuffle=False, num_workers=2, drop_last=False)
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu' )
+    
     # create the model
     K = args.K
     norm_type = args.set_norm_type
     elnet = ELNet(K, norm_type)
     elnet = elnet.to(device)
 
-    optimizer = optim.Adam(elnet.parameters(), lr=args.lr)#, weight_decay=0.01)
-
+    optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
+    
     if args.lr_scheduler == "plateau":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=5, factor=.3, threshold=1e-4, verbose=True)
     elif args.lr_scheduler == "step":
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=3, gamma=args.gamma)
-
+    
     best_val_loss = float('inf')
     best_val_auc = float(0)
     best_val_accuracy = float(0)
@@ -323,7 +295,6 @@ def parse_arguments():
 
     parser.add_argument('--set_norm_type', type=str, choices=['layer', 'contrast'], default='layer')
     parser.add_argument('--K', type=int, choices=[1,2,3,4], default=4)
-    parser.add_argument('--sampler', type=str, choices=['balanced', 'oversampling'], default='oversampling')
     parser.add_argument('--prefix_name', type=str, required=True)
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)
