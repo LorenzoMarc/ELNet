@@ -6,7 +6,6 @@ import random
 import argparse
 import numpy as np
 from tqdm import tqdm
-from torchdata.samplers import RandomOverSampler
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -191,7 +190,7 @@ def run(args):
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
     #oversampling 
-    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], len(train_dataset.weights[train_dataset.labels]))
+    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], len(train_dataset.weights[train_dataset.labels]), replacement=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=train_sampler, num_workers=4, drop_last=False)
     
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
@@ -300,7 +299,7 @@ def parse_arguments():
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)
     parser.add_argument('--lr_scheduler', type=str,
                         default='plateau', choices=['plateau', 'step'])
-    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--gamma', type=float, default=0.5)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-5)

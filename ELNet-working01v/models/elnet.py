@@ -46,7 +46,10 @@ class ELNet(nn.Module):
     )
  
 
-    self.conv2 = nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2)
+    self.conv2 =  nn.Sequential(
+        nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2),
+        nn.ReLU(inplace=True)
+    )
     self.blurpool2 = nn.Sequential(
         nn.Conv2d(8*K, 8*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
@@ -57,7 +60,10 @@ class ELNet(nn.Module):
         nn.ReLU()
     )
       
-    self.conv3 = nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1)
+    self.conv3 = nn.Sequential(
+        nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1),
+        nn.ReLU(inplace=True)
+    )
     self.blurpool3 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(inplace=True),
@@ -69,7 +75,10 @@ class ELNet(nn.Module):
     )
 
     
-    self.conv4 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
+    self.conv4 =  nn.Sequential(
+        nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1),
+        nn.ReLU(inplace=True)
+    )
     self.blurpool4 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(inplace=True),
@@ -80,7 +89,10 @@ class ELNet(nn.Module):
         nn.ReLU()
     )
 
-    self.conv5 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
+    self.conv5 =  nn.Sequential(
+        nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1),
+        nn.ReLU(inplace=True)
+    )
     self.blurpool5 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(inplace=True),

@@ -111,11 +111,12 @@ for task in ['acl', 'meniscus', 'abnormal']:
     accuracy, sensitivity, specificity = ut.accuracy_sensitivity_specificity(y_val, y_class_preds)
     final_results_val[task] = [auc, accuracy, sensitivity, specificity]
 
-exp_dir = args.path_to_models#.split('/')[:-2]
+exp_dir = args.path_to_models.split('/')[:-2]
 
 # save results to csv file 
-with open(os.path.join(*exp_dir, 'results', f'model-results.csv'), 'w') as res_file:
+with open(os.path.join(exp_dir, 'results', f'model-results.csv'), 'w') as res_file:
     fw = csv.writer(res_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     fw.writerow(['Task', 'AUC', 'Accuracy', 'Sensitivity', 'Specifity'])
     for ck in final_results_val.keys():
         fw.writerow([f'{ck}'] + [str(val) for val in final_results_val[ck]])
+    

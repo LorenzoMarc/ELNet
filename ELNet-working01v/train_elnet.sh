@@ -4,6 +4,8 @@ DATA_PATH='/content/MRNet-v1.0/'
 NORM='layer'
 LR=1e-5
 EPOCHS=20
+SEED = 1 # --seed $SEED
+SCHEDULER = 'step' #--lr_scheduler $SCHEDULER
 PREFIX=ELNet
 
 python3 /content/ELNet-working01v/train.py -t acl -p sagittal --experiment $EXPERIMENT --data-path $DATA_PATH --prefix_name $PREFIX --epochs=$EPOCHS --set_norm_type $NORM --lr=$LR
