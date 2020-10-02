@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data as data
 import utils as ut
+import torchvision.transforms as transform
+import random
 
 # PyTorch class to load the ELNet dataset
 
@@ -43,24 +45,29 @@ class ELDataset(data.Dataset):
     def __getitem__(self, index):
         array = np.load(self.paths[index])
         
-        label = torch.FloatTensor([self.labels[index]])
+        #label = torch.FloatTensor([self.labels[index]])
+        label = torch.LongTensor([self.labels[index]])
 
         weight = torch.FloatTensor([self.weights[self.labels[index]]])
 
         if self.train:
-            # data augmentation
-            array = ut.random_shift(array, 10)
-            array = ut.random_rotate(array, 10)
-            array = ut.random_flip(array)
+          # data augmentation
+          array = ut.random_shift(array, 10)
+          array = ut.random_rotate(array, 10)
+          array = ut.random_flip(array)
         if self.plane == 'axial' or self.plane == 'coronal':
-            array = ut.random_rotate(array, 90)
-
+           array = ut.random_rotate(array, 90)
+           '''
+           l = [90,180,270]
+           rand_rotation = transform.RandomRotation(random.choice(l))
+           array = rand_rotation(array)
+           '''
 
         # data standardization
-        #array = (array - 58.09) / 49.73    ???? no need cause LayerNorm layer 
-        #array = np.stack((array,)*3, axis=1)
+        #array = (array - 58.09) / 49.73   # ???? no needs cause LayerNorm layer 
+        array = np.stack((array,), axis=1)
 
-        array = torch.FloatTensor(array) # array size is now [S, 3, 256, 256]
+        array = torch.FloatTensor(array) # array size is now [S, 256, 256,1]
 
         return array, label, weight
 
