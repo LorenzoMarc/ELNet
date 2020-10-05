@@ -1,9 +1,3 @@
-# Copyright (c) 2019, Adobe Inc. All rights reserved.
-#
-# This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike
-# 4.0 International Public License. To view a copy of this license, visit
-# https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode.
- 
 import torch
 import torch.nn.parallel
 import random
@@ -15,92 +9,75 @@ import torch.nn.functional as F
 from IPython import embed
 import antialiased_cnns
 
-def conv_block(channels, kernel_size,norm,dilation=1, iter=2):
-    """
-    :param channels: the input channel amount (same for output)
-    :param kernel_size: 2D convolution kernel
-    :param repeats: amount of repeats before added with identity
-    :param normalization: the type of multi-slice normalization used
-    :return: nn.Sequential(for the given block)
-    """
-
-    conv_list = nn.ModuleList([])
-
+def ident_block(channels, kernel_size,norm,dilation=1, iter=2):
+    block_list = nn.ModuleList([])
     for i in range(iter):
         conv2d = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
                            dilation=1, stride=1,
                            padding=(kernel_size + ((dilation - 1) * (kernel_size - 1))) // 2)
-
         conv_list.append(conv2d)
         conv_list.append(normalization(channels, norm))
         conv_list.append(nn.ReLU())
-
     return nn.Sequential(*conv_list)
 
-
-
+# Group norm può essere visualizzato come una generalizzazione di instanceNorm e LayerNorm
 def normalization(channel, norma_type):
     if norma_type == 'constrast':
-        layer = nn.GroupNorm(channel, channel)
+        layer = nn.GroupNorm(channel, channel)  #nn.InstanceNorm2d()
     else:
-        layer = nn.GroupNorm(1, channel)
+        layer = nn.GroupNorm(1, channel)        #nn.LayerNorm()
     return layer
 
 class ELNet(nn.Module):
  
   def __init__(self, K, norm_type):
     super(ELNet, self).__init__()
-    '''
-    if norm_type=='layer':
-
-      self.norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
-      norm2  = nn.LayerNorm((4*K, 62,62), eps = 1e-8, elementwise_affine=True)
-      norm3 = nn.LayerNorm((8*K, 29,29), eps = 1e-8, elementwise_affine=True)
-      norm4 = nn.LayerNorm((16*K, 13,13), eps = 1e-8, elementwise_affine=True)
-      norm5 = nn.LayerNorm((16*K, 5,5), eps = 1e-8, elementwise_affine=True)
-    else:
-      self.norm1 = nn.InstanceNorm2d(4*K,eps=1e-8, affine=True)
-      norm2  = nn.InstanceNorm2d(4*K, eps=1e-8, affine=True)
-      norm3 = nn.InstanceNorm2d(8*K, eps=1e-8, affine=True)
-      norm4 = nn.InstanceNorm2d(16*K, eps=1e-8, affine=True)
-      norm5 = nn.InstanceNorm2d(16*K,eps=1e-8, affine=True)
-    '''
     
     self.conv1 = nn.Conv2d(1,4*K, kernel_size=7, stride= 2, padding=3)
     self.norm = normalization(4*K, norm_type)
 
+    #Da articolo di Zhang: conversione da blocco convoluzionale in conv_downsample
     self.blurpool1 = nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
         antialiased_cnns.BlurPool(channels=4*K, filt_size=5, stride=2))
-    self.block1= conv_block(channels=4*K, kernel_size=5,norm=norm_type, iter = 2 ) 
+
+    self.block1= ident_block(channels=4*K, kernel_size=5,norm=norm_type, iter = 2 ) 
 
     self.conv2 =nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2)
+
+    #Da articolo di Zhang: conversione da blocco convoluzionale in conv_downsample
     self.blurpool2 = nn.Sequential(
         nn.Conv2d(8*K, 8*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
         antialiased_cnns.BlurPool(channels=8*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block2 =conv_block(8*K, kernel_size= 3,norm=norm_type, iter = 2) 
+    self.block2 =ident_block(8*K, kernel_size= 3,norm=norm_type, iter = 2) 
       
     self.conv3 =nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1)
+
+    #Da articolo di Zhang: conversione da blocco convoluzionale in conv_downsample
     self.blurpool3 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block3 = conv_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)    
+    self.block3 = ident_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)    
     self.conv4 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
 
+    #Da articolo di Zhang: conversione da blocco convoluzionale in conv_downsample
     self.blurpool4 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block4 =conv_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)
+
+
+    self.block4 =ident_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)
 
     self.conv5=nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
-        
+
+    #Da articolo di Zhang: conversione da blocco convoluzionale in conv_downsample    
     self.blurpool5 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(),
@@ -113,7 +90,8 @@ class ELNet(nn.Module):
 
     self.fc= nn.Linear(16*K, 2)
 
-
+  #conv_net serve per ridurre la dimensione delle feature map in
+  # slice x Channels x H x W, con H,W = 1
   def conv_net(self,x):
         x = x.permute(1,0,2,3)
 
@@ -134,18 +112,15 @@ class ELNet(nn.Module):
         x = nn.AdaptiveMaxPool2d(1)(x)
         x = self.drop(x)
 
-        return x
-
-    
+        return x    
    
   def forward(self, x):
-     #x = torch.squeeze(x, dim=0)
-     feat = self.conv_net(x) # sxCxHxW
-     feat = feat.squeeze(3)
-     feat = feat.permute(2,1,0) # 1x16kxs
 
-     #classifier
-     x = self.max_pool(feat).squeeze(2) # 1x16K
+     x = self.conv_net(x) # sxCxHxW
+     x = x.squeeze(3) #sx16x1
+     x = x.permute(2,1,0) # 1x16kxs
+     x = self.max_pool(x).squeeze(2) # 1x16K
+
      res = self.fc(x)
      return res
 

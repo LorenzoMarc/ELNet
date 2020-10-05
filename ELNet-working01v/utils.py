@@ -49,6 +49,9 @@ def accuracy_sensitivity_specificity(y_trues, y_preds):
     #accuracy = (cm[0,0] + cm[1,1]) / total
     #sensitivity = cm[1,1] / (cm[1,1] + cm[1,0])
     #specificity = cm[0,0] / (cm[0,0] + cm[0,1])
+
+    ##MCC
+    #accuracy = (tp*tn) - (fp*fn) / ((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))**2
     accuracy = (tp + tn) / total
     sensitivity = tp / (tp + fn)
     specificity = tn / (tn + fp)

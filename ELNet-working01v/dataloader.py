@@ -45,7 +45,6 @@ class ELDataset(data.Dataset):
     def __getitem__(self, index):
         array = np.load(self.paths[index])
         
-        #label = torch.FloatTensor([self.labels[index]])
         label = torch.LongTensor([self.labels[index]])
 
         weight = torch.FloatTensor([self.weights[self.labels[index]]])
@@ -57,17 +56,7 @@ class ELDataset(data.Dataset):
           array = ut.random_flip(array)
         if self.plane == 'axial' or self.plane == 'coronal':
            array = ut.random_rotate(array, 90)
-           '''
-           l = [90,180,270]
-           rand_rotation = transform.RandomRotation(random.choice(l))
-           array = rand_rotation(array)
-           '''
-
-        # data standardization
-        #array = (array - 58.09) / 49.73   # ???? no needs cause LayerNorm layer 
-        #array = np.stack((array,), axis=1)
-
-        array = torch.FloatTensor(array) # array size is now [S, 256, 256,1]
+        array = torch.FloatTensor(array) 
 
         return array, label, weight
 

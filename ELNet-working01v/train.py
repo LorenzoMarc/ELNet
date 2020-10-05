@@ -11,12 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
-
-
-
 from dataloader import ELDataset
 from models.elnet import ELNet
-
 from sklearn import metrics
 import csv
 import utils as ut
