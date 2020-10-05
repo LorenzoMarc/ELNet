@@ -114,7 +114,7 @@ for task in ['acl', 'meniscus', 'abnormal']:
 exp_dir = args.path_to_models.split('/')[:-2]
 
 # save results to csv file 
-with open(os.path.join(exp_dir, 'results', f'model-results.csv'), 'w') as res_file:
+with open(os.path.join(*exp_dir, 'results', f'model-results.csv'), 'w') as res_file:
     fw = csv.writer(res_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
     fw.writerow(['Task', 'AUC', 'Accuracy', 'Sensitivity', 'Specifity'])
     for ck in final_results_val.keys():

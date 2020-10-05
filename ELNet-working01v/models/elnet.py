@@ -6,19 +6,51 @@
  
 import torch
 import torch.nn.parallel
+import random
+import math
+import os
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 from IPython import embed
 import antialiased_cnns
 
-# ELNet architecture definition
+def conv_block(channels, kernel_size,norm,dilation=1, iter=2):
+    """
+    :param channels: the input channel amount (same for output)
+    :param kernel_size: 2D convolution kernel
+    :param repeats: amount of repeats before added with identity
+    :param normalization: the type of multi-slice normalization used
+    :return: nn.Sequential(for the given block)
+    """
+
+    conv_list = nn.ModuleList([])
+
+    for i in range(iter):
+        conv2d = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
+                           dilation=1, stride=1,
+                           padding=(kernel_size + ((dilation - 1) * (kernel_size - 1))) // 2)
+
+        conv_list.append(conv2d)
+        conv_list.append(normalization(channels, norm))
+        conv_list.append(nn.ReLU())
+
+    return nn.Sequential(*conv_list)
+
+
+
+def normalization(channel, norma_type):
+    if norma_type == 'constrast':
+        layer = nn.GroupNorm(channel, channel)
+    else:
+        layer = nn.GroupNorm(1, channel)
+    return layer
 
 class ELNet(nn.Module):
  
-   def __init__(self, K, norm_type):
+  def __init__(self, K, norm_type):
     super(ELNet, self).__init__()
-
+    '''
     if norm_type=='layer':
 
       self.norm1 = nn.LayerNorm((4*K, 128,128), eps = 1e-8, elementwise_affine=True)
@@ -32,83 +64,92 @@ class ELNet(nn.Module):
       norm3 = nn.InstanceNorm2d(8*K, eps=1e-8, affine=True)
       norm4 = nn.InstanceNorm2d(16*K, eps=1e-8, affine=True)
       norm5 = nn.InstanceNorm2d(16*K,eps=1e-8, affine=True)
-    
+    '''
     
     self.conv1 = nn.Conv2d(1,4*K, kernel_size=7, stride= 2, padding=3)
+    self.norm = normalization(4*K, norm_type)
+
     self.blurpool1 = nn.Sequential(
         nn.Conv2d(4*K,4*K, kernel_size= 7,stride=1,padding=1),
-        nn.ReLU(inplace=True),
-        antialiased_cnns.BlurPool(channels=4*K, filt_size=3, stride=2))
-    self.block1= nn.Sequential(
-        nn.Conv2d(4*K,4*K, kernel_size=5, stride =1, padding = 2),
-        norm2,
-        nn.ReLU()
-    )
- 
+        nn.ReLU(),
+        antialiased_cnns.BlurPool(channels=4*K, filt_size=5, stride=2))
+    self.block1= conv_block(channels=4*K, kernel_size=5,norm=norm_type, iter = 2 ) 
 
-    self.conv2 =  nn.Sequential(
-        nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2),
-        nn.ReLU(inplace=True)
-    )
+    self.conv2 =nn.Conv2d(4*K, 8*K, kernel_size= 5, padding = 2)
     self.blurpool2 = nn.Sequential(
         nn.Conv2d(8*K, 8*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
-        antialiased_cnns.BlurPool(channels=8*K, filt_size=3, stride=2) #prova filt = 3
+        antialiased_cnns.BlurPool(channels=8*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block2 = nn.Sequential(nn.Conv2d(8*K,8*K, kernel_size=3, stride=1, padding=1),
-        norm3,
-        nn.ReLU()
-    )
+    self.block2 =conv_block(8*K, kernel_size= 3,norm=norm_type, iter = 2) 
       
-    self.conv3 = nn.Sequential(
-        nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1),
-        nn.ReLU(inplace=True)
-    )
+    self.conv3 =nn.Conv2d(8*K, 16*K, kernel_size= 3, padding = 1)
     self.blurpool3 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 7,stride=1,padding=1),
-        nn.ReLU(inplace=True),
-        antialiased_cnns.BlurPool(channels=16*K, filt_size=3, stride=2) #prova filt = 3
+        nn.ReLU(),
+        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block3 = nn.Sequential(nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
-        norm4,
-        nn.ReLU()
-    )
+    self.block3 = conv_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)    
+    self.conv4 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
 
-    
-    self.conv4 =  nn.Sequential(
-        nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1),
-        nn.ReLU(inplace=True)
-    )
     self.blurpool4 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
-        nn.ReLU(inplace=True),
+        nn.ReLU(),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
-    self.block4 = nn.Sequential(nn.Conv2d(16*K,16*K, kernel_size=3, stride=1, padding=1),
-        norm5,
-        nn.ReLU()
-    )
+    self.block4 =conv_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)
 
-    self.conv5 =  nn.Sequential(
-        nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1),
-        nn.ReLU(inplace=True)
-    )
+    self.conv5=nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
+        
     self.blurpool5 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
-        nn.ReLU(inplace=True),
+        nn.ReLU(),
         antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
     )
 
-    self.pooling = nn.MaxPool2d(kernel_size=2,stride = 1)
+    self.max_pool = nn.AdaptiveMaxPool1d(1)
 
-    self.fc1= nn.Sequential(
-        nn.Dropout(),
-        nn.Linear(16*K, 2)
-        )
+    self.drop = nn.Dropout()
+
+    self.fc= nn.Linear(16*K, 2)
+
+
+  def conv_net(self,x):
+        x = x.permute(1,0,2,3)
+
+        x = self.blurpool1(F.relu(self.norm(self.conv1(x))))
+        x = x + self.block1(x)
+
+        x = self.blurpool2(F.relu(self.conv2(x)))
+        x = x + self.block2(x)
+
+        x = self.blurpool3(F.relu(self.conv3(x)))
+        x = x + self.block3(x)
+
+        x = self.blurpool4(F.relu(self.conv4(x)))
+        x = x +self.block4(x)
+
+        x = self.blurpool5(F.relu(self.conv5(x)))
+
+        x = nn.AdaptiveMaxPool2d(1)(x)
+        x = self.drop(x)
+
+        return x
+
     
+   
+  def forward(self, x):
+     #x = torch.squeeze(x, dim=0)
+     feat = self.conv_net(x) # sxCxHxW
+     feat = feat.squeeze(3)
+     feat = feat.permute(2,1,0) # 1x16kxs
 
-   def forward(self, x):
-     x = torch.squeeze(x, dim=0)    
+     #classifier
+     x = self.max_pool(feat).squeeze(2) # 1x16K
+     res = self.fc(x)
+     return res
+
+     '''
      x = self.conv1(x)
      x = self.norm1(x)
      # --> sx4Kx128x128
@@ -164,3 +205,4 @@ class ELNet(nn.Module):
      x = self.fc1(x)
      # --> 2
      return x
+     '''

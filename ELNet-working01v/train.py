@@ -12,13 +12,16 @@ import torch.optim as optim
 import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 
+
+
 from dataloader import ELDataset
 from models.elnet import ELNet
 
 from sklearn import metrics
 import csv
 import utils as ut
-
+import warnings
+warnings.filterwarnings('ignore') 
 
 def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every=100):
     """
@@ -31,7 +34,8 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     y_preds = []
     y_trues = []
     losses = []
-    auc = 0.0
+    auc = float(0)
+    mcc = float(0)
 
     soft = nn.Softmax(dim=1)
     criterion = nn.CrossEntropyLoss()
@@ -60,15 +64,17 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         try:
           auc = metrics.roc_auc_score(y_trues, y_preds)
+          mcc = metrics.matthews_corrcoef(y_trues, y_preds)
         except:
           auc = 0.5
 
         writer.add_scalar('Train/Loss', loss_value,
                           epoch * len(train_loader) + i)
         writer.add_scalar('Train/AUC', auc, epoch * len(train_loader) + i)
+        writer.add_scalar('Train/MCC', mcc, epoch * len(train_loader) + i)
 
         if (i % log_every == 0) & (i > 0):
-            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ]| avg train loss {4} | train auc : {5} | lr : {6}'''.
+            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ]| avg train loss {4} | train auc : {5} | lr : {6}  | mcc : {7}'''.
                   format(
                       epoch + 1,
                       num_epochs,
@@ -76,15 +82,19 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
                       len(train_loader),
                       np.round(np.mean(losses), 4),
                       np.round(auc, 4),
-                      current_lr
+                      current_lr,
+                      np.round(mcc, 4)
                   ))
 
     writer.add_scalar('Train/AUC_epoch', auc, epoch)
+    writer.add_scalar('Train/MCC_epoch', mcc, epoch)
 
     train_loss_epoch = np.round(np.mean(losses), 4)
     train_auc_epoch = np.round(auc, 4)
+    train_mcc_epoch = np.round(mcc, 4)
+
     
-    return train_loss_epoch, train_auc_epoch
+    return train_loss_epoch, train_auc_epoch, train_mcc_epoch
 
 
 def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, device, log_every=20):
@@ -97,7 +107,8 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     y_preds = []
     y_class_preds = []
     losses = []
-    auc =0.0
+    auc = float(0)
+    mcc = float(0)
 
     soft = nn.Softmax(dim=1)
     for i, (image, label, weight) in enumerate(val_loader):
@@ -106,7 +117,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         label = label.to(device)
         weight = weight.to(device)
 
-        prediction = model.forward(image)
+        prediction = model(image)
         criterion = nn.CrossEntropyLoss()
         loss = criterion(prediction, label[0])
 
@@ -122,14 +133,17 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
 
         try:
           auc = metrics.roc_auc_score(y_trues, y_preds)
+          mcc = metrics.matthews_corrcoef(y_trues, y_preds)
         except:
           auc = 0.5
 
         writer.add_scalar('Val/Loss', loss_value, epoch * len(val_loader) + i)
         writer.add_scalar('Val/AUC', auc, epoch * len(val_loader) + i)
+        writer.add_scalar('Train/MCC', mcc, epoch * len(val_loader) + i)
+
 
         if (i % log_every == 0) & (i > 0):
-            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss {4} | val auc : {5} | lr : {6} '''.
+            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss: {4} | val auc : {5} | lr : {6} | val mcc: {7}'''.
                   format(
                       epoch + 1,
                       num_epochs,
@@ -137,21 +151,24 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
                       len(val_loader),
                       np.round(np.mean(losses), 4),
                       np.round(auc, 4),
-                      current_lr
+                      current_lr,
+                      np.round(mcc, 4),
                   )
                   )
 
     writer.add_scalar('Val/AUC_epoch', auc, epoch)
+    writer.add_scalar('Train/MCC_epoch', mcc, epoch)
 
     val_loss_epoch = np.round(np.mean(losses), 4)
     val_auc_epoch = np.round(auc, 4)
+    val_mcc_epoch = np.round(mcc, 4)
 
     val_accuracy, val_sensitivity, val_specificity = ut.accuracy_sensitivity_specificity(y_trues, y_class_preds)
     val_accuracy = np.round(val_accuracy, 4)
     val_sensitivity = np.round(val_sensitivity, 4)
     val_specificity = np.round(val_specificity, 4)
 
-    return val_loss_epoch, val_auc_epoch, val_accuracy, val_sensitivity, val_specificity
+    return val_loss_epoch, val_auc_epoch, val_accuracy, val_sensitivity, val_specificity, val_mcc_epoch
 
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
@@ -190,7 +207,8 @@ def run(args):
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
     #oversampling 
-    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], len(train_dataset.weights[train_dataset.labels]), replacement=True)
+    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], 
+        len(train_dataset.weights[train_dataset.labels]), replacement=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=train_sampler, num_workers=4, drop_last=False)
     
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
@@ -218,6 +236,7 @@ def run(args):
     best_val_accuracy = float(0)
     best_val_sensitivity = float(0)
     best_val_specificity = float(0)
+    best_val_mcc = float(-1)
 
     num_epochs = args.epochs
     iteration_change_loss = 0
@@ -233,10 +252,10 @@ def run(args):
         t_start = time.time()
         
         # train
-        train_loss, train_auc = train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
+        train_loss, train_auc, train_mcc= train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
         
         # evaluate
-        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity = evaluate_model(elnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
+        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity,val_mcc = evaluate_model(elnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
 
         if args.lr_scheduler == 'plateau':
             scheduler.step(val_loss)
@@ -246,8 +265,8 @@ def run(args):
         t_end = time.time()
         delta = t_end - t_start
 
-        print("train loss : {0} | train auc {1} | val loss {2} | val auc {3} | elapsed time {4} s".format(
-            train_loss, train_auc, val_loss, val_auc, delta))
+        print("train loss : {0} | train auc {1} | train mcc: {2} | val loss {3} | val auc {4} | val mcc: {5} | elapsed time {6} s".format(
+            train_loss, train_auc,train_mcc, val_loss, val_auc, val_mcc, delta))
 
         iteration_change_loss += 1
         print('-' * 30)
@@ -272,12 +291,15 @@ def run(args):
             print('Early stopping after {0} iterations without the decrease of the val loss'.
                   format(iteration_change_loss))
             break
+        
+        if val_mcc > best_val_mcc:
+            best_val_mcc = val_mcc
 
     # save results to csv file
     with open(os.path.join(exp_dir, 'results', f'model_{args.prefix_name}_{args.task}_{args.plane}-results.csv'), 'w') as res_file:
         fw = csv.writer(res_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        fw.writerow(['LOSS', 'AUC-best', 'Accuracy-best', 'Sensitivity-best', 'Specifity-best'])
-        fw.writerow([best_val_loss, best_val_auc, best_val_accuracy, best_val_sensitivity, best_val_specificity])
+        fw.writerow(['LOSS', 'AUC-best', 'MCC-best' 'Accuracy-best', 'Sensitivity-best', 'Specifity-best'])
+        fw.writerow([best_val_loss, best_val_auc, best_val_mcc, best_val_accuracy, best_val_sensitivity, best_val_specificity])
         res_file.close()
 
     t_end_training = time.time()
