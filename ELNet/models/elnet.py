@@ -15,10 +15,10 @@ def ident_block(channels, kernel_size,norm,dilation=1, iter=2):
         conv2d = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
                            dilation=1, stride=1,
                            padding=(kernel_size + ((dilation - 1) * (kernel_size - 1))) // 2)
-        conv_list.append(conv2d)
-        conv_list.append(normalization(channels, norm))
-        conv_list.append(nn.ReLU())
-    return nn.Sequential(*conv_list)
+        block_list.append(conv2d)
+        block_list.append(normalization(channels, norm))
+        block_list.append(nn.ReLU())
+    return nn.Sequential(*block_list)
 
 # Group norm può essere visualizzato come una generalizzazione di instanceNorm e LayerNorm
 def normalization(channel, norma_type):
