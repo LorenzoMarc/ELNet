@@ -17,6 +17,14 @@ def random_rotate(array, max_angle):
     else:
         return array
 
+def rotate_(array, angle):
+    array_out = np.zeros(array.shape)
+
+    for i in range(array.shape[0]):
+        array_out[i] = rotate(array[i], angle, preserve_range=True)
+
+    return array_out
+
 def random_shift(array, max_shift):
     if random.random() > 0.5:
         array_out = np.zeros(array.shape)

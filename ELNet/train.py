@@ -124,7 +124,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
     
         y_trues.append(int(label[0]))
         preds = torch.argmax(probas, 1)
-        y_preds.append(preds.item())
+        y_preds.append(int(preds))
         y_class_preds.append((preds > 0.5).float().item())
 
         try:
@@ -216,6 +216,7 @@ def run(args):
     K = args.K
     norm_type = args.set_norm_type
     elnet = ELNet(K, norm_type)
+
     elnet = elnet.to(device)
 
     optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
@@ -294,7 +295,7 @@ def run(args):
     # save results to csv file
     with open(os.path.join(exp_dir, 'results', f'model_{args.prefix_name}_{args.task}_{args.plane}-results.csv'), 'w') as res_file:
         fw = csv.writer(res_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-        fw.writerow(['LOSS', 'AUC-best', 'MCC-best' 'Accuracy-best', 'Sensitivity-best', 'Specifity-best'])
+        fw.writerow(['LOSS', 'AUC-best', 'MCC-best', 'Accuracy-best', 'Sensitivity-best', 'Specifity-best'])
         fw.writerow([best_val_loss, best_val_auc, best_val_mcc, best_val_accuracy, best_val_sensitivity, best_val_specificity])
         res_file.close()
 
@@ -316,14 +317,14 @@ def parse_arguments():
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)
     parser.add_argument('--lr_scheduler', type=str,
-                        default='plateau', choices=['plateau', 'step'])
+                        default='plateau', choices=['plateau', 'step', 'None'])
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--gamma', type=float, default=0.5)
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-5)
     parser.add_argument('--flush_history', type=int, choices=[0, 1], default=0)
     parser.add_argument('--save_model', type=int, choices=[0, 1], default=1)
-    parser.add_argument('--patience', type=int, default=50)
+    parser.add_argument('--patience', type=int, default=200)
     parser.add_argument('--log_every', type=int, default=100)
     args = parser.parse_args()
     return args

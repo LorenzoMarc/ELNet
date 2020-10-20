@@ -14,7 +14,7 @@ def ident_block(channels, kernel_size,norm,dilation=1, iter=2):
     for i in range(iter):
         conv2d = nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=kernel_size,
                            dilation=1, stride=1,
-                           padding=(kernel_size + ((dilation - 1) * (kernel_size - 1))) // 2)
+                           padding=(kernel_size - 1 )// 2)
         block_list.append(conv2d)
         block_list.append(normalization(channels, norm))
         block_list.append(nn.ReLU())
@@ -22,10 +22,10 @@ def ident_block(channels, kernel_size,norm,dilation=1, iter=2):
 
 # Group norm può essere visualizzato come una generalizzazione di instanceNorm e LayerNorm
 def normalization(channel, norma_type):
-    if norma_type == 'constrast':
-        layer = nn.GroupNorm(channel, channel)  #nn.InstanceNorm2d()
+    if norma_type == 'contrast':
+        layer = nn.GroupNorm(channel, channel, affine=True, eps=1e-8)  #nn.InstanceNorm2d()
     else:
-        layer = nn.GroupNorm(1, channel)        #nn.LayerNorm()
+        layer = nn.GroupNorm(1, channel, affine=True, eps=1e-8)        #nn.LayerNorm()
     return layer
 
 class ELNet(nn.Module):
@@ -50,7 +50,7 @@ class ELNet(nn.Module):
     self.blurpool2 = nn.Sequential(
         nn.Conv2d(8*K, 8*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
-        antialiased_cnns.BlurPool(channels=8*K, filt_size=5, stride=2) #prova filt = 3
+        antialiased_cnns.BlurPool(channels=8*K, filt_size=5, stride=2)
     )
     self.block2 =ident_block(8*K, kernel_size= 3,norm=norm_type, iter = 2) 
       
@@ -60,7 +60,7 @@ class ELNet(nn.Module):
     self.blurpool3 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 7,stride=1,padding=1),
         nn.ReLU(),
-        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
+        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2)
     )
     self.block3 = ident_block(16*K, kernel_size= 3,norm=norm_type, iter = 1)    
     self.conv4 = nn.Conv2d(16*K, 16*K, kernel_size= 3, padding = 1)
@@ -69,7 +69,7 @@ class ELNet(nn.Module):
     self.blurpool4 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(),
-        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
+        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2)
     )
 
 
@@ -81,7 +81,7 @@ class ELNet(nn.Module):
     self.blurpool5 = nn.Sequential(
         nn.Conv2d(16*K, 16*K, kernel_size= 5,stride=1,padding=1),
         nn.ReLU(),
-        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2) #prova filt = 3
+        antialiased_cnns.BlurPool(channels=16*K, filt_size=5, stride=2)
     )
 
     self.max_pool = nn.AdaptiveMaxPool1d(1)
@@ -123,61 +123,3 @@ class ELNet(nn.Module):
 
      res = self.fc(x)
      return res
-
-     '''
-     x = self.conv1(x)
-     x = self.norm1(x)
-     # --> sx4Kx128x128
-     x = self.blurpool1(x)
-     # --> sx4Kx62x62
-     #Block1 [5x5]
-     b1 = x
-     for i in [1,2]:
-       b1 = self.block1(b1)
-
-     #skip connection
-     x = x + b1
-
-     x = self.conv2(x)
-     # --> sx8Kx62x62
-     x = self.blurpool2(x)
-     # --> sx8Kx29x29
-     #Block2 [3x3]
-     b2 = x
-     for i in [1,2]:
-       b2 = self.block2(b2)
-
-     #skip connection
-     x = x + b2
-  
-     x = self.conv3(x)
-     # --> sx16Kx29x29
-     x = self.blurpool3(x)
-     # --> sx16Kx13x13
-     #Block3 [3x3]
-     b3 = self.block3(x)
-      
-     #skip connection
-     x = x + b3
-  
-     x = self.conv4(x)
-     x= self.blurpool3(x)
-     # --> sx16Kx5x5
-     #Block4 [3x3]
-     b4 = self.block4(x)
-
-     #skip connection
-     x = x + b4
-  
-     x = self.conv5(x)
-     x = self.blurpool5(x)
-     # --> sx16K
-
-     # Feature Extraction
-     x = self.pooling(x).view(x.size(0), -1)
-     x = torch.max(x, dim=0, keepdim=True)[0]
-     # --> 16K
-     x = self.fc1(x)
-     # --> 2
-     return x
-     '''

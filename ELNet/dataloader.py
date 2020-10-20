@@ -52,10 +52,15 @@ class ELDataset(data.Dataset):
         if self.train:
           # data augmentation
           array = ut.random_shift(array, 10)
-          array = ut.random_rotate(array, 10)
+          array = ut.random_rotate(array, 10) #if self.plane == 'sagittal' else ut.random_rotate(array, 90)
           array = ut.random_flip(array)
+        
         if self.plane == 'axial' or self.plane == 'coronal':
-           array = ut.random_rotate(array, 90)
+           array = ut.rotate_(array, random.choice([0, 1, 2, 3]) * 90)
+
+
+        array = (array - 58.09) / 49.73
+        
         array = torch.FloatTensor(array) 
 
         return array, label, weight
