@@ -1,13 +1,13 @@
 import os
 import pandas as pd
 import numpy as np
-
 import torch
 import torch.nn.functional as F
 import torch.utils.data as data
 import utils as ut
 import torchvision.transforms as transform
 import random
+
 
 # PyTorch class to load the ELNet dataset
 
@@ -44,24 +44,22 @@ class ELDataset(data.Dataset):
 
     def __getitem__(self, index):
         array = np.load(self.paths[index])
-        
+
         label = torch.LongTensor([self.labels[index]])
 
         weight = torch.FloatTensor([self.weights[self.labels[index]]])
 
         if self.train:
-          # data augmentation
-          array = ut.random_shift(array, 10)
-          array = ut.random_rotate(array, 10) #if self.plane == 'sagittal' else ut.random_rotate(array, 90)
-          array = ut.random_flip(array)
-        
-        if self.plane == 'axial' or self.plane == 'coronal':
-           array = ut.rotate_(array, random.choice([0, 1, 2, 3]) * 90)
+            # data augmentation
+            array = ut.random_shift(array, 10)
+            array = ut.random_rotate(array, 10)  # if self.plane == 'sagittal' else ut.random_rotate(array, 90)
+            array = ut.random_flip(array)
 
+        if self.plane == 'axial' or self.plane == 'coronal':
+            array = ut.rotate_(array, random.choice([0, 1, 2, 3]) * 90)
 
         array = (array - 58.09) / 49.73
-        
-        array = torch.FloatTensor(array) 
+
+        array = torch.FloatTensor(array)
 
         return array, label, weight
-

@@ -9,7 +9,6 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 from dataloader import ELDataset
 from models.elnet import ELNet
@@ -17,14 +16,19 @@ from sklearn import metrics
 import csv
 import utils as ut
 import warnings
-warnings.filterwarnings('ignore') 
+
+warnings.filterwarnings('ignore')
+
 
 def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every=100):
     """
     Procedure to train a model on the training set
     """
     model.train()
-
+    if torch.cuda.is_available():
+        device = 'gpu'
+    else:
+        device = 'cpu'
     model = model.to(device)
 
     y_preds = []
@@ -39,13 +43,13 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
 
         image = image.to(device)
         label = label.to(device)
-        weight = weight.to(device)
+#        weight = weight.to(device)
 
-        prediction = model(image) 
+        prediction = model(image)
 
         loss = criterion(prediction, label[0])
 
-        optimizer.zero_grad()      
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
@@ -55,14 +59,14 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         probas = soft(prediction)
 
         y_trues.append(int(label[0]))
-        preds = torch.argmax(probas,dim=1)
-        y_preds.append(int(preds)) 
+        preds = torch.argmax(probas, dim=1)
+        y_preds.append(int(preds))
 
         try:
-          auc = metrics.roc_auc_score(y_trues, y_preds)
-          mcc = metrics.matthews_corrcoef(y_trues, y_preds)
+            auc = metrics.roc_auc_score(y_trues, y_preds)
+            mcc = metrics.matthews_corrcoef(y_trues, y_preds)
         except:
-          auc = 0.5
+            auc = 0.5
 
         writer.add_scalar('Train/Loss', loss_value,
                           epoch * len(train_loader) + i)
@@ -70,17 +74,18 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
         writer.add_scalar('Train/MCC', mcc, epoch * len(train_loader) + i)
 
         if (i % log_every == 0) & (i > 0):
-            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ]| avg train loss {4} | train auc : {5} | lr : {6}  | mcc : {7}'''.
-                  format(
-                      epoch + 1,
-                      num_epochs,
-                      i,
-                      len(train_loader),
-                      np.round(np.mean(losses), 4),
-                      np.round(auc, 4),
-                      current_lr,
-                      np.round(mcc, 4)
-                  ))
+            print(
+                '''[Epoch: {0} / {1} |Single batch number : {2} / {3} ]| avg train loss {4} | train auc : {5} | lr : {6}  | mcc : {7}'''.
+                format(
+                    epoch + 1,
+                    num_epochs,
+                    i,
+                    len(train_loader),
+                    np.round(np.mean(losses), 4),
+                    np.round(auc, 4),
+                    current_lr,
+                    np.round(mcc, 4)
+                ))
 
     writer.add_scalar('Train/AUC_epoch', auc, epoch)
     writer.add_scalar('Train/MCC_epoch', mcc, epoch)
@@ -89,7 +94,6 @@ def train_model(model, train_loader, epoch, num_epochs, optimizer, writer, curre
     train_auc_epoch = np.round(auc, 4)
     train_mcc_epoch = np.round(mcc, 4)
 
-    
     return train_loss_epoch, train_auc_epoch, train_mcc_epoch
 
 
@@ -111,7 +115,7 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
 
         image = image.to(device)
         label = label.to(device)
-        weight = weight.to(device)
+#        weight = weight.to(device)
 
         prediction = model(image)
         criterion = nn.CrossEntropyLoss()
@@ -121,36 +125,36 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
         losses.append(loss_value)
 
         probas = soft(prediction)
-    
+
         y_trues.append(int(label[0]))
         preds = torch.argmax(probas, 1)
         y_preds.append(int(preds))
         y_class_preds.append((preds > 0.5).float().item())
 
         try:
-          auc = metrics.roc_auc_score(y_trues, y_preds)
-          mcc = metrics.matthews_corrcoef(y_trues, y_preds)
+            auc = metrics.roc_auc_score(y_trues, y_preds)
+            mcc = metrics.matthews_corrcoef(y_trues, y_preds)
         except:
-          auc = 0.5
+            auc = 0.5
 
         writer.add_scalar('Val/Loss', loss_value, epoch * len(val_loader) + i)
         writer.add_scalar('Val/AUC', auc, epoch * len(val_loader) + i)
         writer.add_scalar('Train/MCC', mcc, epoch * len(val_loader) + i)
 
-
         if (i % log_every == 0) & (i > 0):
-            print('''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss: {4} | val auc : {5} | lr : {6} | val mcc: {7}'''.
-                  format(
-                      epoch + 1,
-                      num_epochs,
-                      i,
-                      len(val_loader),
-                      np.round(np.mean(losses), 4),
-                      np.round(auc, 4),
-                      current_lr,
-                      np.round(mcc, 4),
-                  )
-                  )
+            print(
+                '''[Epoch: {0} / {1} |Single batch number : {2} / {3} ] | avg val loss: {4} | val auc : {5} | lr : {6} | val mcc: {7}'''.
+                format(
+                    epoch + 1,
+                    num_epochs,
+                    i,
+                    len(val_loader),
+                    np.round(np.mean(losses), 4),
+                    np.round(auc, 4),
+                    current_lr,
+                    np.round(mcc, 4),
+                )
+            )
 
     writer.add_scalar('Val/AUC_epoch', auc, epoch)
     writer.add_scalar('Train/MCC_epoch', mcc, epoch)
@@ -166,9 +170,11 @@ def evaluate_model(model, val_loader, epoch, num_epochs, writer, current_lr, dev
 
     return val_loss_epoch, val_auc_epoch, val_accuracy, val_sensitivity, val_specificity, val_mcc_epoch
 
+
 def get_lr(optimizer):
     for param_group in optimizer.param_groups:
         return param_group['lr']
+
 
 def run(args):
     random.seed(args.seed)
@@ -199,19 +205,22 @@ def run(args):
     writer = SummaryWriter(logdir)
 
     ##-----SAMPLER------
-    
+
     # create training and validation set
     train_dataset = ELDataset(args.data_path, args.task, args.plane, train=True)
-    #oversampling 
-    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels], 
-        len(train_dataset.weights[train_dataset.labels]), replacement=True)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1,sampler=train_sampler, num_workers=4, drop_last=False)
-    
+    # oversampling
+    train_sampler = torch.utils.data.WeightedRandomSampler(train_dataset.weights[train_dataset.labels],
+                                                           len(train_dataset.weights[train_dataset.labels]),
+                                                           replacement=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, sampler=train_sampler, num_workers=4,
+                                               drop_last=False)
+
     validation_dataset = ELDataset(args.data_path, args.task, args.plane, train=False)
-    validation_loader = torch.utils.data.DataLoader(validation_dataset,batch_size=1, shuffle=False, num_workers=2, drop_last=False)
-    
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu' )
-    
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=False, num_workers=2,
+                                                    drop_last=False)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # create the model
     K = args.K
     norm_type = args.set_norm_type
@@ -220,14 +229,14 @@ def run(args):
     elnet = elnet.to(device)
 
     optimizer = optim.Adam(elnet.parameters(), lr=args.lr, weight_decay=0.01)
-    
+
     if args.lr_scheduler == "plateau":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, patience=5, factor=.3, threshold=1e-4, verbose=True)
     elif args.lr_scheduler == "step":
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=3, gamma=args.gamma)
-    
+
     best_val_loss = float('inf')
     best_val_auc = float(0)
     best_val_accuracy = float(0)
@@ -241,18 +250,23 @@ def run(args):
     log_every = args.log_every
 
     t_start_training = time.time()
-    
+
     # train and test loop
     for epoch in range(num_epochs):
         current_lr = get_lr(optimizer)
 
         t_start = time.time()
-        
+
         # train
-        train_loss, train_auc, train_mcc= train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer, current_lr, device, log_every)
-        
+        train_loss, train_auc, train_mcc = train_model(elnet, train_loader, epoch, num_epochs, optimizer, writer,
+                                                       current_lr, device, log_every)
+
         # evaluate
-        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity,val_mcc = evaluate_model(elnet, validation_loader, epoch, num_epochs, writer, current_lr, device)
+        val_loss, val_auc, val_accuracy, val_sensitivity, val_specificity, val_mcc = evaluate_model(elnet,
+                                                                                                    validation_loader,
+                                                                                                    epoch, num_epochs,
+                                                                                                    writer, current_lr,
+                                                                                                    device)
 
         if args.lr_scheduler == 'plateau':
             scheduler.step(val_loss)
@@ -262,8 +276,9 @@ def run(args):
         t_end = time.time()
         delta = t_end - t_start
 
-        print("train loss : {0} | train auc {1} | train mcc: {2} | val loss {3} | val auc {4} | val mcc: {5} | elapsed time {6} s".format(
-            train_loss, train_auc,train_mcc, val_loss, val_auc, val_mcc, delta))
+        print(
+            "train loss : {0} | train auc {1} | train mcc: {2} | val loss {3} | val auc {4} | val mcc: {5} | elapsed time {6} s".format(
+                train_loss, train_auc, train_mcc, val_loss, val_auc, val_mcc, delta))
 
         iteration_change_loss += 1
         print('-' * 30)
@@ -288,15 +303,17 @@ def run(args):
             print('Early stopping after {0} iterations without the decrease of the val loss'.
                   format(iteration_change_loss))
             break
-        
+
         if val_mcc > best_val_mcc:
             best_val_mcc = val_mcc
 
     # save results to csv file
-    with open(os.path.join(exp_dir, 'results', f'model_{args.prefix_name}_{args.task}_{args.plane}-results.csv'), 'w') as res_file:
+    with open(os.path.join(exp_dir, 'results', f'model_{args.prefix_name}_{args.task}_{args.plane}-results.csv'),
+              'w') as res_file:
         fw = csv.writer(res_file, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
         fw.writerow(['LOSS', 'AUC-best', 'MCC-best', 'Accuracy-best', 'Sensitivity-best', 'Specifity-best'])
-        fw.writerow([best_val_loss, best_val_auc, best_val_mcc, best_val_accuracy, best_val_sensitivity, best_val_specificity])
+        fw.writerow(
+            [best_val_loss, best_val_auc, best_val_mcc, best_val_accuracy, best_val_sensitivity, best_val_specificity])
         res_file.close()
 
     t_end_training = time.time()
@@ -312,7 +329,7 @@ def parse_arguments():
     parser.add_argument('--data-path', type=str)
 
     parser.add_argument('--set_norm_type', type=str, choices=['layer', 'contrast'], default='layer')
-    parser.add_argument('--K', type=int, choices=[1,2,3,4], default=4)
+    parser.add_argument('--K', type=int, choices=[1, 2, 3, 4], default=4)
     parser.add_argument('--prefix_name', type=str, required=True)
     parser.add_argument('--experiment', type=str, required=True)
     parser.add_argument('--augment', type=int, choices=[0, 1], default=1)
@@ -328,6 +345,7 @@ def parse_arguments():
     parser.add_argument('--log_every', type=int, default=100)
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
     args = parse_arguments()
